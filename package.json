@@ -1,0 +1,23 @@
+{
+  "name": "nexora-savings",
+  "version": "1.0.0",
+  "description": "NEXORA SAVINGS - Premium Android Savings Tracker",
+  "main": "index.js",
+  "scripts": {
+    "build": "echo 'Static web assets - no build step required'",
+    "cap:sync": "npx cap sync android",
+    "cap:open": "npx cap open android",
+    "android:build": "cd android && ./gradlew assembleDebug"
+  },
+  "keywords": ["savings", "tracker", "capacitor", "firebase", "android"],
+  "author": "Nexora",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "firebase": "^10.14.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}
