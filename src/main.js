@@ -11,7 +11,7 @@ const db = getDatabase(firebaseApp);
 const APP_PASSWORD = 'risham0043';
 const STORAGE_KEY = 'nexora-savings-personal-data';
 const defaultData = { balance: 0, totalSaved: 0, totalWithdrawn: 0, goal: 0, transactions: {} };
-const state = { user: null, data: { ...defaultData }, screen: 'dashboard', loading: false, unsubscribe: null };
+const state = { user: null, data: { ...defaultData }, screen: 'dashboard', loading: false, unsubscribe: null, firebaseReady: false };
 const root = document.querySelector('#app');
 const money = value => `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[c]));
@@ -43,18 +43,20 @@ async function handleAuth(event) {
     sessionStorage.setItem('nexora-unlocked', '1');
     subscribeRealtime();
     render();
-  } catch { toast('Could not connect to Firebase. Check your internet connection.', 'error'); }
+  } catch { useOfflineMode(); toast('Firebase unavailable. App opened in offline mode; enable Anonymous sign-in to sync.', 'error'); }
 }
 function loadLocalData() {
   try { state.data = { ...defaultData, ...(JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')) }; }
   catch { state.data = { ...defaultData }; }
 }
+function useOfflineMode() { state.user = { uid: 'offline-device', displayName: 'Risham', email: 'Personal app' }; state.firebaseReady = false; loadLocalData(); sessionStorage.setItem('nexora-unlocked', '1'); render(); }
 async function saveLocalData() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
-  if (state.user?.uid) await set(ref(db, `savings/${state.user.uid}`), state.data);
+  if (state.firebaseReady && state.user?.uid) await set(ref(db, `savings/${state.user.uid}`), state.data);
 }
 function subscribeRealtime() {
   if (state.unsubscribe) state.unsubscribe();
+  state.firebaseReady = true;
   state.unsubscribe = onValue(ref(db, `savings/${state.user.uid}`), snapshot => {
     state.data = { ...defaultData, ...(snapshot.val() || {}) };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
@@ -91,6 +93,6 @@ async function deleteTransaction(id) { const tx = state.data.transactions?.[id];
 
 
 if (sessionStorage.getItem('nexora-unlocked') === '1') {
-  signInAnonymously(auth).then(credential => { state.user = { uid: credential.user.uid, displayName: 'Risham', email: 'Personal app' }; subscribeRealtime(); render(); }).catch(() => { state.user = null; render(); });
+  signInAnonymously(auth).then(credential => { state.user = { uid: credential.user.uid, displayName: 'Risham', email: 'Personal app' }; subscribeRealtime(); render(); }).catch(() => { useOfflineMode(); });
 }
 render();
