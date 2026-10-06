@@ -1,5 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { getDatabase, ref, onValue, set } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
 import './style.css';
@@ -9,7 +10,6 @@ const auth = getAuth(firebaseApp);
 const db = getDatabase(firebaseApp);
 
 const STORAGE_KEY = 'nexora-savings-data';
-const googleProvider = new GoogleAuthProvider();
 const defaultData = { balance: 0, totalSaved: 0, totalWithdrawn: 0, goal: 0, transactions: {} };
 const state = { user: null, data: { ...defaultData }, screen: 'dashboard', loading: false, unsubscribe: null, firebaseReady: false };
 const root = document.querySelector('#app');
@@ -37,7 +37,7 @@ async function handleAuth() {
   const button = document.querySelector('#google-sign-in');
   button.disabled = true; button.classList.add('loading'); button.querySelector('span:nth-child(2)').textContent = 'Opening Google…';
   try {
-    await signInWithPopup(auth, googleProvider);
+    await FirebaseAuthentication.signInWithGoogle();
   } catch (error) {
     button.disabled = false; button.classList.remove('loading'); button.querySelector('span:nth-child(2)').textContent = 'Continue with Google';
     const message = error.code === 'auth/popup-closed-by-user' ? 'Google sign-in was cancelled.' : error.code === 'auth/unauthorized-domain' ? 'Add this app domain in Firebase Authentication → Settings → Authorized domains.' : 'Google sign-in failed. Please try again.';
@@ -79,7 +79,7 @@ function profileView() { const name = state.user.displayName || 'Nexora saver'; 
 
 function bindAppEvents() {
   document.querySelectorAll('[data-nav]').forEach(el => el.addEventListener('click', () => navigate(el.dataset.nav)));
-  document.querySelector('[data-logout]')?.addEventListener('click', async () => { if (state.unsubscribe) state.unsubscribe(); state.unsubscribe = null; await signOut(auth); });
+  document.querySelector('[data-logout]')?.addEventListener('click', async () => { if (state.unsubscribe) state.unsubscribe(); state.unsubscribe = null; await FirebaseAuthentication.signOut(); });
   document.querySelector('#money-form')?.addEventListener('submit', handleMoney);
   document.querySelector('#goal-form')?.addEventListener('submit', handleGoal);
   document.querySelectorAll('[data-delete]').forEach(el => el.addEventListener('click', () => deleteTransaction(el.dataset.delete)));
