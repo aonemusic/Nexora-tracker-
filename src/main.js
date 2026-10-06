@@ -12,6 +12,7 @@ const APP_PASSWORD = 'risham0043';
 const STORAGE_KEY = 'nexora-savings-personal-data';
 const defaultData = { balance: 0, totalSaved: 0, totalWithdrawn: 0, goal: 0, transactions: {} };
 const state = { user: null, data: { ...defaultData }, screen: 'dashboard', loading: false, unsubscribe: null };
+const root = document.querySelector('#app');
 const money = value => `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[c]));
 const txns = () => Object.entries(state.data.transactions || {}).map(([id, t]) => ({ id, ...t })).sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
