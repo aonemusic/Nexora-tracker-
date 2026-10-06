@@ -4,7 +4,11 @@
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['balance', 'totalSaved', 'totalWithdrawn', 'goal', 'transactions'])",
         "transactions": {
+          "$transactionId": {
+            ".validate": "newData.hasChildren(['type', 'amount', 'timestamp']) && newData.child('type').val() in ['add', 'withdraw'] && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('timestamp').isNumber()"
+          },
           ".indexOn": ["timestamp"]
         }
       }

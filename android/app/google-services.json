@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "339747858388",
+    "firebase_url": "https://savings-traker-database-default-rtdb.firebaseio.com",
+    "project_id": "savings-traker-database",
+    "storage_bucket": "savings-traker-database.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:339747858388:android:04bb761ca7d31caf6b1841",
+        "android_client_info": { "package_name": "com.nexora.savings" }
+      },
+      "oauth_client": [
+        { "client_id": "339747858388-3ta95n2tnliaj57kckrkp8o2jco3ijfi.apps.googleusercontent.com", "client_type": 3 }
+      ],
+      "api_key": [
+        { "current_key": "AIzaSyAOg3yIp1ltaaU-_f-uhaAeL2abZVqKq7c" }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            { "client_id": "339747858388-3ta95n2tnliaj57kckrkp8o2jco3ijfi.apps.googleusercontent.com", "client_type": 3 }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

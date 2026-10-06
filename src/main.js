@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { getDatabase, ref, onValue, set } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
 import './style.css';
@@ -8,8 +8,8 @@ const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getDatabase(firebaseApp);
 
-const APP_PASSWORD = 'risham0043';
-const STORAGE_KEY = 'nexora-savings-personal-data';
+const STORAGE_KEY = 'nexora-savings-data';
+const googleProvider = new GoogleAuthProvider();
 const defaultData = { balance: 0, totalSaved: 0, totalWithdrawn: 0, goal: 0, transactions: {} };
 const state = { user: null, data: { ...defaultData }, screen: 'dashboard', loading: false, unsubscribe: null, firebaseReady: false };
 const root = document.querySelector('#app');
@@ -29,27 +29,26 @@ function render() {
 }
 
 function renderAuth() {
-  root.innerHTML = `<div class="auth-page"><div class="auth-glow"></div><div class="auth-brand"><div class="brand-mark">N</div><span>NEXORA</span></div><section class="auth-card"><div class="eyebrow">PRIVATE SAVINGS SPACE</div><h1>Welcome back</h1><p class="muted">Enter your personal password to unlock your savings.</p><form id="auth-form"><label>App password<input id="password" type="password" autocomplete="current-password" required placeholder="Enter password"></label><button class="primary-button" type="submit">Unlock app <span>→</span></button></form></section><p class="auth-foot">Personal mode · Data stays on this device.</p></div>`;
-  document.querySelector('#auth-form').addEventListener('submit', handleAuth);
+  root.innerHTML = `<div class="auth-page"><div class="auth-glow"></div><div class="auth-brand"><div class="brand-mark">N</div><span>NEXORA</span></div><section class="auth-card"><div class="eyebrow">SMART SAVINGS, FOR EVERYONE</div><h1>Your money.<br><em>Your momentum.</em></h1><p class="muted">Sign in with Google to keep your savings securely synced in real time.</p><button class="google-button" id="google-sign-in"><span class="google-g">G</span><span>Continue with Google</span><span class="google-arrow">→</span></button><p class="auth-privacy">Each account has a private savings space. Only you can access your data.</p></section><p class="auth-foot">Secure login powered by Firebase Authentication.</p></div>`;
+  document.querySelector('#google-sign-in').addEventListener('click', handleAuth);
 }
 
-async function handleAuth(event) {
-  event.preventDefault();
-  const password = event.currentTarget.querySelector('#password').value;
-  if (password !== APP_PASSWORD) return toast('Incorrect password.', 'error');
+async function handleAuth() {
+  const button = document.querySelector('#google-sign-in');
+  button.disabled = true; button.classList.add('loading'); button.querySelector('span:nth-child(2)').textContent = 'Opening Google…';
   try {
-    const credential = await signInAnonymously(auth);
-    state.user = { uid: credential.user.uid, displayName: 'Risham', email: 'Personal app' };
-    sessionStorage.setItem('nexora-unlocked', '1');
-    subscribeRealtime();
-    render();
-  } catch { useOfflineMode(); toast('Firebase unavailable. App opened in offline mode; enable Anonymous sign-in to sync.', 'error'); }
+    await signInWithPopup(auth, googleProvider);
+  } catch (error) {
+    button.disabled = false; button.classList.remove('loading'); button.querySelector('span:nth-child(2)').textContent = 'Continue with Google';
+    const message = error.code === 'auth/popup-closed-by-user' ? 'Google sign-in was cancelled.' : error.code === 'auth/unauthorized-domain' ? 'Add this app domain in Firebase Authentication → Settings → Authorized domains.' : 'Google sign-in failed. Please try again.';
+    toast(message, 'error');
+  }
 }
+
 function loadLocalData() {
   try { state.data = { ...defaultData, ...(JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')) }; }
   catch { state.data = { ...defaultData }; }
 }
-function useOfflineMode() { state.user = { uid: 'offline-device', displayName: 'Risham', email: 'Personal app' }; state.firebaseReady = false; loadLocalData(); sessionStorage.setItem('nexora-unlocked', '1'); render(); }
 async function saveLocalData() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
   if (state.firebaseReady && state.user?.uid) await set(ref(db, `savings/${state.user.uid}`), state.data);
@@ -80,7 +79,7 @@ function profileView() { const name = state.user.displayName || 'Nexora saver'; 
 
 function bindAppEvents() {
   document.querySelectorAll('[data-nav]').forEach(el => el.addEventListener('click', () => navigate(el.dataset.nav)));
-  document.querySelector('[data-logout]')?.addEventListener('click', () => { if (state.unsubscribe) state.unsubscribe(); state.unsubscribe = null; state.user = null; sessionStorage.removeItem('nexora-unlocked'); render(); toast('App locked safely.'); });
+  document.querySelector('[data-logout]')?.addEventListener('click', async () => { if (state.unsubscribe) state.unsubscribe(); state.unsubscribe = null; await signOut(auth); });
   document.querySelector('#money-form')?.addEventListener('submit', handleMoney);
   document.querySelector('#goal-form')?.addEventListener('submit', handleGoal);
   document.querySelectorAll('[data-delete]').forEach(el => el.addEventListener('click', () => deleteTransaction(el.dataset.delete)));
@@ -92,7 +91,11 @@ async function handleGoal(event) { event.preventDefault(); const goal = Number(e
 async function deleteTransaction(id) { const tx = state.data.transactions?.[id]; if (!tx) return; delete state.data.transactions[id]; if (tx.type === 'add') { state.data.balance = Math.max(0, Number(state.data.balance || 0) - Number(tx.amount)); state.data.totalSaved = Math.max(0, Number(state.data.totalSaved || 0) - Number(tx.amount)); } else { state.data.balance = Number(state.data.balance || 0) + Number(tx.amount); state.data.totalWithdrawn = Math.max(0, Number(state.data.totalWithdrawn || 0) - Number(tx.amount)); } await saveLocalData(); toast('Transaction deleted and totals adjusted.'); render(); }
 
 
-if (sessionStorage.getItem('nexora-unlocked') === '1') {
-  signInAnonymously(auth).then(credential => { state.user = { uid: credential.user.uid, displayName: 'Risham', email: 'Personal app' }; subscribeRealtime(); render(); }).catch(() => { useOfflineMode(); });
-}
+onAuthStateChanged(auth, user => {
+  state.user = user;
+  state.loading = false;
+  if (state.unsubscribe) { state.unsubscribe(); state.unsubscribe = null; }
+  if (user) { subscribeRealtime(); } else { state.firebaseReady = false; state.data = { ...defaultData }; }
+  render();
+});
 render();
