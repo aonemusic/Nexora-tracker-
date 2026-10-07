@@ -12,7 +12,7 @@ A multi-user Capacitor Android savings tracker with native Google Sign-In and Fi
 ## Firebase Console setup
 
 1. Open Firebase Console for project `savings-traker-database`.
-2. Authentication → Sign-in method → enable **Google**.
+2. Authentication → Sign-in method → enable **Google** and **Email/Password**.
 3. Add SHA-1 and SHA-256 fingerprints to the Android app for package `com.nexora.savings`.
 4. Realtime Database → Rules: publish `database.rules.json`.
 5. `android/app/google-services.json` is included and matches package `com.nexora.savings`.

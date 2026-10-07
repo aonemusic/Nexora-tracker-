@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { getDatabase, ref, onValue, set } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -29,8 +29,10 @@ function render() {
 }
 
 function renderAuth() {
-  root.innerHTML = `<div class="auth-page"><div class="auth-glow"></div><div class="auth-brand"><div class="brand-mark">N</div><span>NEXORA</span></div><section class="auth-card"><div class="eyebrow">SMART SAVINGS, FOR EVERYONE</div><h1>Your money.<br><em>Your momentum.</em></h1><p class="muted">Sign in with Google to keep your savings securely synced in real time.</p><button class="google-button" id="google-sign-in"><span class="google-g">G</span><span>Continue with Google</span><span class="google-arrow">→</span></button><p class="auth-privacy">Each account has a private savings space. Only you can access your data.</p></section><p class="auth-foot">Secure login powered by Firebase Authentication.</p></div>`;
+  root.innerHTML = `<div class="auth-page"><div class="auth-glow"></div><div class="auth-brand"><div class="brand-mark">N</div><span>NEXORA</span></div><section class="auth-card"><div class="eyebrow">SMART SAVINGS, FOR EVERYONE</div><h1>Your money.<br><em>Your momentum.</em></h1><p class="muted">Sign in securely and keep your savings synced in real time.</p><button class="google-button" id="google-sign-in"><span class="google-g">G</span><span>Continue with Google</span><span class="google-arrow">→</span></button><div class="auth-divider"><span>or use email</span></div><form id="email-auth-form"><label>Email address<input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com"></label><label>Password<input id="auth-password" type="password" autocomplete="current-password" minlength="6" required placeholder="At least 6 characters"></label><div class="email-actions"><button class="primary-button" type="submit" data-auth-action="signin">Sign in <span>→</span></button><button class="secondary-button" type="submit" data-auth-action="signup">Create account</button></div><button class="link-button" id="forgot-password" type="button">Forgot password?</button></form><p class="auth-privacy">Each account has a private savings space. Only you can access your data.</p></section><p class="auth-foot">Secure login powered by Firebase Authentication.</p></div>`;
   document.querySelector('#google-sign-in').addEventListener('click', handleAuth);
+  document.querySelector('#email-auth-form').addEventListener('submit', handleEmailAuth);
+  document.querySelector('#forgot-password').addEventListener('click', handleForgotPassword);
 }
 
 async function handleAuth() {
@@ -45,6 +47,25 @@ async function handleAuth() {
     const message = /10|DEVELOPER_ERROR|12500|CONFIGURATION/i.test(code) ? 'Google setup incomplete. Add the APK SHA-1 in Firebase, download a new google-services.json, and rebuild.' : /cancel/i.test(code) ? 'Google sign-in was cancelled.' : 'Google sign-in failed (' + code + '). Check Firebase Google provider setup.';
     toast(message, 'error');
   }
+}
+
+async function handleEmailAuth(event) {
+  event.preventDefault();
+  const form = event.currentTarget, email = form.querySelector('#auth-email').value.trim(), password = form.querySelector('#auth-password').value;
+  const action = event.submitter?.dataset.authAction || 'signin';
+  try {
+    if (action === 'signup') await createUserWithEmailAndPassword(auth, email, password);
+    else await signInWithEmailAndPassword(auth, email, password);
+  } catch (error) {
+    const messages = { 'auth/invalid-credential':'Email or password is incorrect.', 'auth/user-not-found':'No account found for this email.', 'auth/wrong-password':'Email or password is incorrect.', 'auth/email-already-in-use':'This email already has an account. Sign in instead.', 'auth/weak-password':'Use a password with at least 6 characters.', 'auth/invalid-email':'Enter a valid email address.' };
+    toast(messages[error.code] || 'Email sign-in failed. Please try again.', 'error');
+  }
+}
+async function handleForgotPassword() {
+  const email = document.querySelector('#auth-email').value.trim();
+  if (!email) return toast('Enter your email first, then tap Forgot password.', 'error');
+  try { await sendPasswordResetEmail(auth, email); toast('Password reset email sent.'); }
+  catch (error) { toast(error.code === 'auth/user-not-found' ? 'No account found for this email.' : 'Could not send the reset email.', 'error'); }
 }
 
 function loadLocalData() {
