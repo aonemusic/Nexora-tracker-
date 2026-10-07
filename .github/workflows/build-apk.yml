@@ -43,6 +43,11 @@ jobs:
       - name: Build web assets and sync Capacitor
         run: npm run cap:sync
 
+      - name: Use Firebase-registered debug signing key
+        run: |
+          mkdir -p ~/.android
+          cp android/debug.keystore ~/.android/debug.keystore
+
       - name: Build Android debug APK
         run: ./gradlew assembleDebug
         working-directory: android
