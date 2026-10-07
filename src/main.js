@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, signOut as webSignOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut as webSignOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { getDatabase, ref, onValue, set } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -72,9 +72,9 @@ async function handleForgotPassword() {
 async function handlePasswordlessLogin() {
   const email = document.querySelector('#auth-email').value.trim();
   if (!email) return toast('Enter your email first, then tap the sign-in link option.', 'error');
-  const actionCodeSettings = { url: window.location.origin + window.location.pathname, handleCodeInApp: true, android: { packageName: 'com.nexora.savings', installApp: false, minimumVersion: '1' } };
+  const actionCodeSettings = { url: 'https://savings-traker-database.firebaseapp.com/finishSignIn', handleCodeInApp: true, android: { packageName: 'com.nexora.savings', installApp: true, minimumVersion: '1' } };
   try {
-    await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+    await FirebaseAuthentication.sendSignInLinkToEmail({ email, actionCodeSettings });
     localStorage.setItem('nexora-passwordless-email', email);
     toast('Sign-in link sent. Check your email.');
   } catch (error) {
@@ -83,11 +83,15 @@ async function handlePasswordlessLogin() {
   }
 }
 async function completePasswordlessLogin() {
-  if (!isSignInWithEmailLink(auth, window.location.href)) return;
-  const email = localStorage.getItem('nexora-passwordless-email') || window.prompt('Enter the email address you used:');
-  if (!email) return;
-  try { await signInWithEmailLink(auth, email, window.location.href); localStorage.removeItem('nexora-passwordless-email'); window.history.replaceState({}, document.title, window.location.pathname); }
-  catch (error) { console.error('Passwordless completion error:', error); toast('This sign-in link is expired or already used.', 'error'); }
+  try {
+    const { isSignInWithEmailLink } = await FirebaseAuthentication.isSignInWithEmailLink({ emailLink: window.location.href });
+    if (!isSignInWithEmailLink) return;
+    const email = localStorage.getItem('nexora-passwordless-email') || window.prompt('Enter the email address you used:');
+    if (!email) return;
+    await FirebaseAuthentication.signInWithEmailLink({ email, emailLink: window.location.href });
+    localStorage.removeItem('nexora-passwordless-email');
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } catch (error) { console.error('Passwordless completion error:', error); toast('This sign-in link is expired or already used.', 'error'); }
 }
 
 function loadLocalData() {
