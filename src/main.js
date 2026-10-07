@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, signOut as webSignOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { getDatabase, ref, onValue, set } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -29,10 +29,11 @@ function render() {
 }
 
 function renderAuth() {
-  root.innerHTML = `<div class="auth-page"><div class="auth-glow"></div><div class="auth-brand"><div class="brand-mark">N</div><span>NEXORA</span></div><section class="auth-card"><div class="eyebrow">SMART SAVINGS, FOR EVERYONE</div><h1>Your money.<br><em>Your momentum.</em></h1><p class="muted">Sign in securely and keep your savings synced in real time.</p><button class="google-button" id="google-sign-in"><span class="google-g">G</span><span>Continue with Google</span><span class="google-arrow">→</span></button><div class="auth-divider"><span>or use email</span></div><form id="email-auth-form"><label>Email address<input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com"></label><label>Password<input id="auth-password" type="password" autocomplete="current-password" minlength="6" required placeholder="At least 6 characters"></label><div class="email-actions"><button class="primary-button" type="submit" data-auth-action="signin">Sign in <span>→</span></button><button class="secondary-button" type="submit" data-auth-action="signup">Create account</button></div><button class="link-button" id="forgot-password" type="button">Forgot password?</button></form><p class="auth-privacy">Each account has a private savings space. Only you can access your data.</p></section><p class="auth-foot">Secure login powered by Firebase Authentication.</p></div>`;
+  root.innerHTML = `<div class="auth-page"><div class="auth-glow"></div><div class="auth-brand"><div class="brand-mark">N</div><span>NEXORA</span></div><section class="auth-card"><div class="eyebrow">SMART SAVINGS, FOR EVERYONE</div><h1>Your money.<br><em>Your momentum.</em></h1><p class="muted">Sign in securely and keep your savings synced in real time.</p><button class="google-button" id="google-sign-in"><span class="google-g">G</span><span>Continue with Google</span><span class="google-arrow">→</span></button><div class="auth-divider"><span>or use email</span></div><form id="email-auth-form"><label>Email address<input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com"></label><label>Password<input id="auth-password" type="password" autocomplete="current-password" minlength="6" required placeholder="At least 6 characters"></label><div class="email-actions"><button class="primary-button" type="submit" data-auth-action="signin">Sign in <span>→</span></button><button class="secondary-button" type="submit" data-auth-action="signup">Create account</button></div><div class="passwordless-row"><button class="link-button" id="passwordless-login" type="button">Email me a sign-in link</button><button class="link-button" id="forgot-password" type="button">Forgot password?</button></div></form><p class="auth-privacy">Each account has a private savings space. Only you can access your data.</p></section><p class="auth-foot">Secure login powered by Firebase Authentication.</p></div>`;
   document.querySelector('#google-sign-in').addEventListener('click', handleAuth);
   document.querySelector('#email-auth-form').addEventListener('submit', handleEmailAuth);
   document.querySelector('#forgot-password').addEventListener('click', handleForgotPassword);
+  document.querySelector('#passwordless-login').addEventListener('click', handlePasswordlessLogin);
 }
 
 async function handleAuth() {
@@ -66,6 +67,27 @@ async function handleForgotPassword() {
   if (!email) return toast('Enter your email first, then tap Forgot password.', 'error');
   try { await sendPasswordResetEmail(auth, email); toast('Password reset email sent.'); }
   catch (error) { toast(error.code === 'auth/user-not-found' ? 'No account found for this email.' : 'Could not send the reset email.', 'error'); }
+}
+
+async function handlePasswordlessLogin() {
+  const email = document.querySelector('#auth-email').value.trim();
+  if (!email) return toast('Enter your email first, then tap the sign-in link option.', 'error');
+  const actionCodeSettings = { url: window.location.origin + window.location.pathname, handleCodeInApp: true, android: { packageName: 'com.nexora.savings', installApp: false, minimumVersion: '1' } };
+  try {
+    await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+    localStorage.setItem('nexora-passwordless-email', email);
+    toast('Sign-in link sent. Check your email.');
+  } catch (error) {
+    console.error('Passwordless sign-in error:', error);
+    toast(error.code === 'auth/unauthorized-continue-uri' ? 'Add this app domain in Firebase Authentication → Settings → Authorized domains.' : 'Could not send the sign-in link. Enable Email link in Firebase.', 'error');
+  }
+}
+async function completePasswordlessLogin() {
+  if (!isSignInWithEmailLink(auth, window.location.href)) return;
+  const email = localStorage.getItem('nexora-passwordless-email') || window.prompt('Enter the email address you used:');
+  if (!email) return;
+  try { await signInWithEmailLink(auth, email, window.location.href); localStorage.removeItem('nexora-passwordless-email'); window.history.replaceState({}, document.title, window.location.pathname); }
+  catch (error) { console.error('Passwordless completion error:', error); toast('This sign-in link is expired or already used.', 'error'); }
 }
 
 function loadLocalData() {
@@ -102,7 +124,12 @@ function profileView() { const name = state.user.displayName || 'Nexora saver'; 
 
 function bindAppEvents() {
   document.querySelectorAll('[data-nav]').forEach(el => el.addEventListener('click', () => navigate(el.dataset.nav)));
-  document.querySelector('[data-logout]')?.addEventListener('click', async () => { if (state.unsubscribe) state.unsubscribe(); state.unsubscribe = null; await FirebaseAuthentication.signOut(); });
+  document.querySelector('[data-logout]')?.addEventListener('click', async () => {
+    const button = document.querySelector('[data-logout]');
+    if (button) button.disabled = true;
+    try { if (state.unsubscribe) state.unsubscribe(); state.unsubscribe = null; await Promise.allSettled([FirebaseAuthentication.signOut(), webSignOut(auth)]); state.user = null; state.firebaseReady = false; state.data = { ...defaultData }; render(); toast('Signed out successfully.'); }
+    catch (error) { console.error('Sign-out error:', error); if (button) button.disabled = false; toast('Could not sign out. Please try again.', 'error'); }
+  });
   document.querySelector('#money-form')?.addEventListener('submit', handleMoney);
   document.querySelector('#goal-form')?.addEventListener('submit', handleGoal);
   document.querySelectorAll('[data-delete]').forEach(el => el.addEventListener('click', () => deleteTransaction(el.dataset.delete)));
@@ -113,6 +140,8 @@ async function handleGoal(event) { event.preventDefault(); const goal = Number(e
 
 async function deleteTransaction(id) { const tx = state.data.transactions?.[id]; if (!tx) return; delete state.data.transactions[id]; if (tx.type === 'add') { state.data.balance = Math.max(0, Number(state.data.balance || 0) - Number(tx.amount)); state.data.totalSaved = Math.max(0, Number(state.data.totalSaved || 0) - Number(tx.amount)); } else { state.data.balance = Number(state.data.balance || 0) + Number(tx.amount); state.data.totalWithdrawn = Math.max(0, Number(state.data.totalWithdrawn || 0) - Number(tx.amount)); } await saveLocalData(); toast('Transaction deleted and totals adjusted.'); render(); }
 
+
+completePasswordlessLogin();
 
 onAuthStateChanged(auth, user => {
   state.user = user;
