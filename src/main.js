@@ -40,7 +40,9 @@ async function handleAuth() {
     await FirebaseAuthentication.signInWithGoogle();
   } catch (error) {
     button.disabled = false; button.classList.remove('loading'); button.querySelector('span:nth-child(2)').textContent = 'Continue with Google';
-    const message = error.code === 'auth/popup-closed-by-user' ? 'Google sign-in was cancelled.' : error.code === 'auth/unauthorized-domain' ? 'Add this app domain in Firebase Authentication → Settings → Authorized domains.' : 'Google sign-in failed. Please try again.';
+    console.error('Google sign-in error:', error);
+    const code = String(error?.code || error?.message || 'unknown');
+    const message = /10|DEVELOPER_ERROR|12500|CONFIGURATION/i.test(code) ? 'Google setup incomplete. Add the APK SHA-1 in Firebase, download a new google-services.json, and rebuild.' : /cancel/i.test(code) ? 'Google sign-in was cancelled.' : 'Google sign-in failed (' + code + '). Check Firebase Google provider setup.';
     toast(message, 'error');
   }
 }
